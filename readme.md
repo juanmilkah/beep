@@ -8,3 +8,5 @@ A commandline utility tool to convert Markdown to Html and open using the defaul
 ```bash
 beep foo.md
 ```
+
+Project licensed under the [MIT](LICENSE) License.
