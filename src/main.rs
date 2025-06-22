@@ -1,9 +1,12 @@
+use std::fs;
 use std::io::{self, BufReader, BufWriter, Read, Write};
 use std::{
     env,
     fs::File,
     path::{Path, PathBuf},
 };
+
+const DEFAULT_DIRECTORY: &str = ".beep";
 
 fn usage() {
     println!("Beep [options] <filepath>+");
@@ -25,7 +28,7 @@ fn process_file(filepath: &PathBuf, output_file: &PathBuf) -> io::Result<()> {
         .truncate(true)
         .open(output_file)?;
     let mut file = BufWriter::new(file);
-    file.write_all(&html.as_bytes())?;
+    file.write_all(html.as_bytes())?;
     Ok(())
 }
 
@@ -51,11 +54,27 @@ fn main() {
                 continue;
             }
         }
-        let output = file.file_stem().unwrap_or_default();
-        let output =
-            Path::new(&format!("{}.html", output.to_string_lossy().to_string())).to_path_buf();
-        if process_file(&file, &output).is_err() {
-            continue;
+
+        let home = env::home_dir().unwrap();
+        let output = Path::new(DEFAULT_DIRECTORY);
+        let out_dir = home.join(output);
+
+        if !out_dir.exists() {
+            fs::create_dir(&out_dir).expect("create dir failed");
+        }
+        let filename = format!(
+            "{filename}.html",
+            filename = file.file_stem().unwrap_or_default().to_string_lossy()
+        );
+        let filename = Path::new(&filename);
+        let output = out_dir.join(filename);
+
+        match process_file(&file, &output.to_path_buf()) {
+            Ok(_) => {}
+            Err(err) => {
+                eprintln!("Failed to process file: {:?}", err);
+                continue;
+            }
         };
 
         let status = match std::process::Command::new("handlr")
