@@ -1,19 +1,17 @@
-use std::fs;
-use std::io::{self, BufReader, BufWriter, Read, Write};
 use std::{
     env,
-    fs::File,
+    fs::{self, File},
+    io::{self, BufReader, BufWriter, Read, Write},
     path::{Path, PathBuf},
 };
 
 const DEFAULT_DIRECTORY: &str = ".beep";
-
-fn usage() {
-    println!("Beep [options] <filepath>+");
-    println!("Convert markdown to html files and open them using \nthe default mime application");
-    println!("Examples: ");
-    println!("       beep a.md");
-}
+const USAGE: &str = r#"
+    Beep [options] <filepath>+
+    Convert markdown to html files and open them using the default mime application
+         Examples: 
+            beep a.md
+"#;
 
 fn process_file(filepath: &PathBuf, output_file: &PathBuf) -> io::Result<()> {
     let file = File::options().read(true).open(filepath)?;
@@ -37,14 +35,22 @@ fn main() {
     args.remove(0); // strip off program name
 
     if args.is_empty() {
-        eprintln!("Provide markdown filepath");
+        println!("{USAGE}");
         return;
+    }
+
+    let home = env::home_dir().unwrap();
+    let output = Path::new(DEFAULT_DIRECTORY);
+    let out_dir = home.join(output);
+
+    if !out_dir.exists() {
+        fs::create_dir(&out_dir).expect("create dir failed");
     }
 
     for arg in args {
         let arg = arg.as_str();
         if arg == "--help" || arg == "-h" {
-            usage();
+            println!("{USAGE}");
             return;
         }
 
@@ -55,13 +61,6 @@ fn main() {
             }
         }
 
-        let home = env::home_dir().unwrap();
-        let output = Path::new(DEFAULT_DIRECTORY);
-        let out_dir = home.join(output);
-
-        if !out_dir.exists() {
-            fs::create_dir(&out_dir).expect("create dir failed");
-        }
         let filename = format!(
             "{filename}.html",
             filename = file.file_stem().unwrap_or_default().to_string_lossy()
@@ -69,12 +68,9 @@ fn main() {
         let filename = Path::new(&filename);
         let output = out_dir.join(filename);
 
-        match process_file(&file, &output.to_path_buf()) {
-            Ok(_) => {}
-            Err(err) => {
-                eprintln!("Failed to process file: {:?}", err);
-                continue;
-            }
+        if let Err(err) = process_file(&file, &output.to_path_buf()) {
+            eprintln!("Failed to process file: {err:?}");
+            continue;
         };
 
         let status = match std::process::Command::new("handlr")
@@ -84,13 +80,13 @@ fn main() {
         {
             Ok(st) => st,
             Err(e) => {
-                eprintln!("Failed to open handlr: {}", e);
+                eprintln!("Failed to open handlr: {e}; Is it Installed on your system?");
                 return;
             }
         };
         if !status.success() {
             eprintln!("Handlr exited with a non zero code");
         }
-        println!("Opened {:?} in default mime application", &output);
+        println!("Opened {:?} in default browser application", &output);
     }
 }
